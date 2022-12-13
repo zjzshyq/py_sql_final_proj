@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+{% block middle %}
+
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Feature Select</title>
+</head>
+
+<body>
+        <form method="post">
+            {% for feat in feats %}
+            <input type="checkbox" name="feat" value="{{feat}}">{{feat}}<br>
+
+            {% endfor %}
+            <input type="submit" value="sumbit">
+        </form>
+        <a href="/secpage", style=height:20px;><button>return</button></a>
+</body>
+</html>
+{% endblock %}

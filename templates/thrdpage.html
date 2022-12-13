@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% block middle %}
+
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<h1>Data Statistic</h1>
+<div style="visibility:{{ visibility }}">
+    <a href="{{ url_for('visual',feats='stat') }}">User Gender Ratio</a>
+</div>
+
+
+ <a href="/normal", style=height:20px;><button>return</button></a>
+</body>
+
+{% endblock %}

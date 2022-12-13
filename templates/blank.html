@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% block middle %}
+
+<head>
+    <meta charset="UTF-8">
+    <title>Visualization</title>
+</head>
+<body>
+    {% if pca_feat_lst != None %}
+        <p>Top Ratio Feature in Each Component</p>
+        {% for feat in pca_feat_lst %}
+            <p>{{feat}}</p>
+        {% endfor %}
+    {% endif %}
+</body>
+
+{% endblock %}

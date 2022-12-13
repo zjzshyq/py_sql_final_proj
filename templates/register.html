@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+{% block title %}
+    Registration
+{% endblock %}
+{% block middle %}
+ <p style="color: red">{{ msg }}</p>
+    <form action="/register" method="post">
+        <p><input type="text" name="username" placeholder="username"></p>
+        <p><input type="password" name="password" placeholder="passward"></p>
+        <p><input type="password" name="repassword" placeholder="repeating"></p>
+        <p><input type="text" name="info" placeholder="information"></p>
+        <p><input type="submit" value="confirm"></p>
+    </form>
+    <a href="/"><button>return</button></a>
+{% endblock %}

@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% block middle %}
+
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<h1>Unsupervised Learning</h1>
+
+<div style=height:20px;>
+    <a href="{{ url_for('visual',feats='pca') }}">PCA for User Features</a>
+</div>
+
+<div style=height:20px;>
+    <a href="{{ url_for('visual',feats='pca_feat') }}">PCA for Feature Importance</a>
+</div>
+
+
+<div style=height:20px;>
+    <a href="/feat">K-means with Features Dropping</a>
+</div>
+
+<div style=height:20px;>
+    <a href="/param">Apriori For Items</a>
+</div>
+
+ <a href="/normal", style=height:20px;><button>return</button></a>
+</body>
+
+{% endblock %}

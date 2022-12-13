@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{% block middle %}
+
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<h1>Apriori Rules</h1>
+{% for p in params %}
+<p>{{p}}</p>
+{% endfor%}
+<a href="/param"><button>return</button></a>
+</body>
+
+{% endblock %}

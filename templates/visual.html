@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block middle %}
+
+<head>
+    <meta charset="UTF-8">
+    <title>Visualization</title>
+</head>
+<body>
+
+    <p>
+        {% if img2 == None %}
+        <a href="/thrdpage"><img src="{{ img }}"></a>
+        {% else%}
+        <a href="/secpage"><img src="{{ img }}"><img src="{{ img2 }}"></a>
+        {% endif %}
+    </p>
+
+</body>
+
+{% endblock %}

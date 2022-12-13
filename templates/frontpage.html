@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% block middle %}
+
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<h1>Front Page</h1>
+<div style="visibility:{{ visibility }}">
+    <a href="/show">Users Management</a>
+</div>
+
+<div style=height:20px;>
+    <a href="/secpage">Unsupervised Learning</a>
+</div>
+
+<div style=height:20px;>
+    <a href="/thrdpage">Data Statistic</a>
+</div>
+
+ <a href="/", style=height:20px;><button>log out</button></a>
+</body>
+
+{% endblock %}

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title%}User ceter{% endblock %}</title>
+    <style>
+        #head{
+            height:50px;
+            background-color: bisque;
+        }
+        #head ul{
+            list-style: none;
+        }
+        #head ul li{
+            float: left;
+            width:100px;
+            text-align: center;
+            font-size:18px;
+            height:50px;
+            line-height: 50px;
+        }
+        #middle{
+            height: 600px;
+        }
+        #footer{
+            height: 50px;
+            line-height: 50px;
+            background-color: darkcyan;
+        }
+    </style>
+    {% block mycss %}{% endblock %}
+
+</head>
+<body>
+    <div id="head">
+    </div>
+    <div id="middle">
+        {% block middle %}
+        {% endblock %}
+    </div>
+    <div id="footer"></div>
+    {% block myjs %}{% endblock %}
+</body>
+</html>

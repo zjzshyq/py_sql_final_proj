@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block middle %}
+
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<h1>Set param for Aprioi</h1>
+    <form method="post">
+        <div class="mb-3">
+          <label for="exampleInputEmail1" class="form-label">min confidence</label>
+          <input type="text" class="form-control" id="exampleInputEmail1" aria-describedby="emailHelp" name="min_confidence">
+        </div>
+        <div class="mb-3">
+          <label for="exampleInputPassword1" class="form-label">min support</label>
+          <input type="text" class="form-control" id="exampleInputPassword1" name="min_support">
+        </div>
+        <button type="submit" class="btn btn-primary">confirm</button>
+
+      </form>
+      <a href="/param"><button>reset</button></a>
+        <a href="/secpage", style=height:20px;><button>return</button></a>
+</body>
+
+{% endblock %}
