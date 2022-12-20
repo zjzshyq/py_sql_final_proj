@@ -190,7 +190,6 @@ class User(metaclass=ABCMeta):
         sql = "SELECT * FROM manager_info " \
               "WHERE manager_id=\'%s\' AND password=\'%s\'" \
               % (self.username, self.password)
-        print(sql)
         cnt, rows= db.execute_one(sql)
         db.close()
         print(cnt,len(rows))
