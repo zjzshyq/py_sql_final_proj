@@ -7,12 +7,17 @@
 </head>
 <body>
 <h1>Data Statistic</h1>
-<div style="visibility:{{ visibility }}">
-    <a href="{{ url_for('visual',feats='stat') }}">User Gender percentage</a>
-    <a href="">User Behavior</a>
-    <a href="">Order Data</a>
-</div>
+    <div style="visibility:{{ visibility }}">
+        <a href="{{ url_for('visual',feats='stat') }}">User Gender percentage</a>
+    </div>
 
+    <div style="visibility:{{ visibility }}">
+        <a href="">User Behavior</a>
+    </div>
+
+    <div style="visibility:{{ visibility }}">
+        <a href="">Order Data</a>
+    </div>
 
  <a href="/normal", style=height:20px;><button>return</button></a>
 </body>
