@@ -3,24 +3,18 @@ from flask import Flask, request, render_template, redirect, url_for,session
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
+from sklearn.preprocessing import StandardScaler
 from efficient_apriori import apriori
 from werkzeug.serving import run_simple
+from werkzeug.utils import secure_filename
+from pyecharts.charts import Radar, Funnel
+from pyecharts import options as opts
 from abc import ABCMeta
 from io import BytesIO
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import base64, traceback, sqlite3, time, random
-
-from sklearn.preprocessing import StandardScaler
-import hashlib, os
-from werkzeug.utils import secure_filename
-from plotly import graph_objects as go
-from pyecharts.charts import Radar
-from pyecharts import options as opts
-import plotly.express as px
-from pyecharts.charts import Funnel
-
+import base64, traceback, sqlite3, time, random, hashlib, os
 
 
 app = Flask(__name__,template_folder='templates')
@@ -28,6 +22,7 @@ app.secret_key = 'random string'
 UPLOAD_FOLDER = 'static/uploads'
 ALLOWED_EXTENSIONS = set(['jpeg', 'jpg', 'png', 'gif'])
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
 
 class MyDB:
     def __init__(self):
@@ -626,7 +621,6 @@ def front_page2():
 @app.route('/secpage')
 def secpage():
     return render_template('secpage.html')
-
 
 @app.route('/thrdpage')
 def thrdpage():
