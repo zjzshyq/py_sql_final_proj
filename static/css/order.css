@@ -1,0 +1,58 @@
+#tableItems {
+	margin-left: 20px;
+	margin-right: 20px;
+	margin-top: 20px;
+	margin-bottom: 20px;
+}
+
+
+#itemName {
+	margin-left: 5px;
+	margin-right: 5px;
+	margin-top: 5px;
+	margin-bottom: 5px;
+	height: 50px;
+	width: 500px;
+	float: left;
+}
+
+#titleName {
+	width: 500px;
+	float: left;
+}
+#titleTime {
+	width: 500px;
+	float: left;
+}
+#titlePrice {
+	float: left;
+}
+
+#itemPrice {
+	margin-left: 5px;
+	margin-right: 5px;
+	margin-top: 5px;
+	margin-bottom: 5px;
+	height: 50px;
+	display: inline-block;
+}
+
+
+#seperator {
+	margin: 0px;
+	max-width: 100px;
+}
+
+#total {
+	padding-left: 100px;
+}
+
+#itemNameTag {
+	font-weight: bold;
+}
+
+#subtotal {
+	font-weight: bold;
+	font-size: 20px;
+}
+

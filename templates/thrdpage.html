@@ -6,20 +6,31 @@
     <title>Title</title>
 </head>
 <body>
-<h1>User Data Statistic</h1>
-    <div style="visibility:{{ visibility }}">
-        <a href="{{ url_for('visual',feats='stat') }}">User Gender Ratio</a>
-    </div>
+<h1>Data Exploration</h1>
+<div style="visibility:{{ visibility }}">
+    <a href="{{ url_for('visual',feats='stat') }}">User Gender Ratio</a>
+</div>
 
-    <div style="visibility:{{ visibility }}">
-        <a href="">User Behavior</a>
-    </div>
+<div style=height:20px;>
+    <a href="/user/activity">Visualization of user activity</a>
+</div>
 
-    <div style="visibility:{{ visibility }}">
-        <a href="">Order Data</a>
-    </div>
+<div style=height:20px;>
+    <a href="/user/funnel01">Funnel model for Action</a>
+</div>
+<div style=height:20px;>
+    <a href="/user/funnel02">Funnel model for Individual</a>
+</div>
+<div style=height:20px;>
+    <a href="/user/order">Purchase Analysis</a>
+</div>
 
- <a href="/normal", style=height:20px;><button>return</button></a>
+<div style=height:20px;>
+    <a href="/user/radar">Customer segmentation (using K-Means and RFM)</a>
+</div>
+
+<div style=height:50px;></div><a href="/super"><button>return</button></a></div>
+
 </body>
 
 {% endblock %}

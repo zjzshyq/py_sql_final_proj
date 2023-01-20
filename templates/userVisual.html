@@ -1,0 +1,27 @@
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<a href="/thrdpage"><button>return</button></a>
+    <div>
+        {% if img2 == None %}
+        <p><img src="{{ img }}"></p>
+        {% elif img3 == None %}
+        <p><img src="{{ img }}"></p>
+        <p><img src="{{ img2}}"></p>
+        {% else%}
+        <p><img src="{{ img }}"></p>
+        <p><img src="{{ img2}}"></p>
+        <p><img src="{{ img3}}"></p>
+        {% endif %}
+    </div>
+
+
+
+</body>
+
+
+</html>

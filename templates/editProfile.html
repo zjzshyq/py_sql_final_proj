@@ -1,0 +1,53 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<title>Edit Profile </title>
+<link rel="stylesheet" href={{ url_for('static', filename='css/editProfile.css') }} />
+<link rel="stylesheet" href={{ url_for('static', filename='css/topStyle.css') }} />
+</head>
+<body>
+<div id="title">
+	<a href="/ebuy">
+		<img id="logo" src= {{ url_for('static', filename='images/logo.png') }} />
+	</a>
+	<form>
+		<input id="searchBox" type="text" name="searchQuery">
+		<input id="searchButton" type="submit" value="Search">
+	</form>
+
+	{% if not loggedIn %}
+	<div id="signInButton">
+		<a class="link" href="/loginForm">Sign In</a>
+	</div>
+	{% else %}
+	<div class="dropdown">
+		<button class="dropbtn">Hello, <br>{{name}}</button>
+		<div class="dropdown-content">
+			<a href="/favorite">Your favorite{{noOfFavorite}}</a>
+			<a href="/account/profile/edit">Edit Your profile</a>
+			<hr>
+			<a href="/logout">Sign Out</a>
+		</div>
+	</div>
+	{% endif %}
+	<div id="kart">
+		<a class="link" href="/cart">
+			<img src={{url_for('static', filename='images/shoppingCart.png')}} id="cartIcon" />
+			CART {{noOfItems}}
+		</a>
+	</div>
+</div>
+
+<div class="display">
+	<h2>Edit profile</h2>
+	<form action="/updateProfile" method="POST">
+		<p>Email:<input type="email" name="email" value={{profileData[1]}} readonly="readonly"></p>
+		<p>Name:<input type="text" name="name" value={{profileData[2]}}></p>
+		<p>Gender: <input type="text" name="gender" value={{profileData[3]}}></p>
+		<p>Password: <input type="text" name="password" value={{profileData[4]}}></p>
+		<input type="submit" value="Save">
+	</form>
+</div>
+</body>
+</html>
+

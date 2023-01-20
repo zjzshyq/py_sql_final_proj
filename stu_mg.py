@@ -1,5 +1,5 @@
 # coding=utf-8
-from flask import Flask, request, render_template, redirect, url_for
+from flask import Flask, request, render_template, redirect, url_for,session
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
@@ -12,9 +12,22 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import base64, traceback, sqlite3, time, random
 
+from sklearn.preprocessing import StandardScaler
+import hashlib, os
+from werkzeug.utils import secure_filename
+from plotly import graph_objects as go
+from pyecharts.charts import Radar
+from pyecharts import options as opts
+import plotly.express as px
+from pyecharts.charts import Funnel
+
+
 
 app = Flask(__name__,template_folder='templates')
-
+app.secret_key = 'random string'
+UPLOAD_FOLDER = 'static/uploads'
+ALLOWED_EXTENSIONS = set(['jpeg', 'jpg', 'png', 'gif'])
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 class MyDB:
     def __init__(self):
@@ -717,6 +730,912 @@ def apriori_rules(params):
     return render_template('/apriori.html', params=strings)
 
 
+###########################################  above by Yiqing ###########################################################
+###########################################  follow by Ting Wei ##########################################################
+
+def getLoginDetails():
+    with sqlite3.connect('data_management.db') as conn:
+        cur = conn.cursor()
+        if 'email' not in session:
+            loggedIn = False
+            name = ''
+            noOfItems = 0
+            noOfOrderss = 0
+            noOfFavorite = 0
+        else:
+            loggedIn = True
+            cur.execute("SELECT user_id,name FROM user_info WHERE email=?", (session['email'],))
+            user_id, name = cur.fetchone()
+            cur.execute("SELECT count(order_id) FROM orders WHERE user_id=?", (user_id,))
+            noOfOrderss = cur.fetchone()[0]
+            cur.execute("SELECT count(kart_id) FROM kart WHERE user_id=?", (user_id,))
+            noOfItems = cur.fetchone()[0]
+            cur.execute("SELECT count(favorite_id) FROM favorite WHERE user_id=?", (user_id,))
+            noOfFavorite = cur.fetchone()[0]
+    conn.close()
+    return (loggedIn, name, noOfOrderss, noOfItems, noOfFavorite)
+
+
+def parse(data):
+    ans = []
+    i = 0
+    while i < len(data):
+        curr = []
+        for j in range(7):
+            if i >= len(data):
+                break
+            curr.append(data[i])
+            i += 1
+        ans.append(curr)
+    return ans
+
+
+@app.route("/ebuy")
+def ebuy():
+    loggedIn, name, noOfOrderss, noOfItems, noOfFavorite = getLoginDetails()
+    with sqlite3.connect('data_management.db') as conn:
+        cur = conn.cursor()
+        cur.execute('SELECT product_id, name, price, description, image, stock FROM products')
+        itemData1 = cur.fetchall()
+        cur.execute('SELECT categoryId, name FROM categories')
+        categoryData = cur.fetchall()
+    itemData = parse(itemData1)
+    return render_template('ebuy.html', itemData=itemData, loggedIn=loggedIn, name=name, noOfItems=noOfItems,
+                           noOfOrderss=noOfOrderss, noOfFavorite=noOfFavorite, categoryData=categoryData)
+
+
+@app.route("/loginForm")
+def loginForm():
+    if 'email' in session:
+        return redirect(url_for('ebuy'))
+    else:
+        return render_template('userlogin.html', error='')
+
+
+@app.route("/userlogin", methods=['POST', 'GET'])
+def userlogin():
+    if request.method == 'POST':
+        email = request.form['email']
+        password = request.form['password']
+        if is_valid(email, password):
+            session['email'] = email
+            return redirect(url_for('ebuy'))
+        else:
+            error = 'Invalid UserId / Password'
+            return render_template('userlogin.html', error=error)
+
+
+def is_valid(email, password):
+    con = sqlite3.connect('data_management.db')
+    cur = con.cursor()
+    cur.execute('SELECT email, password FROM user_info')
+    data = cur.fetchall()
+    for row in data:
+        if row[0] == email and row[1] == hashlib.md5(password.encode()).hexdigest():
+            return True
+    return False
+
+
+@app.route("/registerationForm")
+def registrationForm():
+    return render_template("registeration.html")
+
+
+@app.route("/registeration", methods=['GET', 'POST'])
+def registeration():
+    if request.method == 'POST':
+        # Parse form data
+        password = request.form['password']
+        email = request.form['email']
+        name = request.form['name']
+        gender = request.form['gender']
+        create_time = time.time()
+        user_id = int(str(np.random.randint(1, 100)) + str(time.time())[0:8])
+        with sqlite3.connect('data_management.db') as con:
+            try:
+                cur = con.cursor()
+                cur.execute(
+                    'INSERT INTO user_info (user_id,password, email, name, gender,create_time) VALUES (?, ?, ?, ?,?,?)',
+                    (user_id, hashlib.md5(password.encode()).hexdigest(), email, name, gender, create_time))
+
+                con.commit()
+
+                msg = "Registered Successfully"
+            except:
+                con.rollback()
+                traceback.print_exc()
+                msg = "Error occured"
+        con.close()
+        return render_template("userlogin.html", error=msg)
+
+
+@app.route("/logout")
+def logout():
+    session.pop('email', None)
+    return redirect(url_for('ebuy'))
+
+
+@app.route("/account/profile/edit")
+def editProfile():
+    if 'email' not in session:
+        return redirect(url_for('root'))
+    loggedIn, name, noOfOrderss, noOfItems, noOfFavorite = getLoginDetails()
+    with sqlite3.connect('data_management.db') as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT user_id, email, name, gender,password FROM user_info WHERE email = ?", (session['email'],))
+        profileData = cur.fetchone()
+    conn.close()
+    return render_template("editProfile.html", profileData=profileData, loggedIn=loggedIn, name=name,
+                           noOfItems=noOfItems, noOfOrderss=noOfOrderss, noOfFavorite=noOfFavorite)
+
+
+@app.route("/updateProfile", methods=["GET", "POST"])
+def updateProfile():
+    if request.method == 'POST':
+        email = request.form['email']
+        name = request.form['name']
+        gender = request.form['gender']
+        password = request.form['password']
+        with sqlite3.connect('data_management.db') as con:
+            try:
+                cur = con.cursor()
+                cur.execute('UPDATE user_info SET name = ?,gender=?,password=? WHERE email = ?',
+                            (name, gender, password, email))
+                con.commit()
+                msg = "Saved Successfully"
+            except:
+                con.rollback()
+                msg = "Error occured"
+        con.close()
+        return redirect(url_for('ebuy'))
+
+
+@app.route("/addToCart")
+def addToCart():
+    if 'email' not in session:
+        return redirect(url_for('loginForm'))
+    else:
+        product_id = int(request.args.get('product_id'))
+        with sqlite3.connect('data_management.db') as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT user_id FROM user_info WHERE email = ?", (session['email'],))
+            user_id = cur.fetchone()[0]
+            kart_id = int(str(np.random.randint(1, 100)) + str(time.time())[0:8])
+            try:
+                cur.execute("INSERT INTO kart (kart_id,user_id, product_id) VALUES (?, ?,?)",
+                            (kart_id, user_id, product_id))
+                conn.commit()
+                msg = "Added successfully"
+            except:
+                conn.rollback()
+                traceback.print_exc()
+                msg = "Error occured"
+            cur.execute('SELECT categoryId FROM products WHERE product_id = ?', (product_id,))
+            categoryId = cur.fetchone()[0]
+            # Trigger and report to the user behavior table- cart type
+            create_time = time.time()
+            behavior_id = int(str(np.random.randint(1, 100)) + str(time.time())[0:8])
+            date = time.strftime('%Y-%m-%d', time.localtime(create_time))
+            year = time.localtime(create_time).tm_year
+            month = time.localtime(create_time).tm_mon
+            day = time.localtime(create_time).tm_mday
+            hour = time.localtime(create_time).tm_hour
+            cur.execute("INSERT INTO user_behavior (behavior_id,user_id, product_id,categoryId,behavior_type,create_time,date,year,month,day,hour) \
+                  VALUES (?, ?,?,?, ?,?,?, ?,?,?, ?)", (
+            behavior_id, user_id, product_id, categoryId, 'cart', create_time, date, year, month, day, hour))
+        conn.close()
+        return redirect(url_for('ebuy'))
+
+
+@app.route("/cart")
+def cart():
+    if 'email' not in session:
+        return redirect(url_for('loginForm'))
+    loggedIn, name, noOfOrderss, noOfItems, noOfFavorite = getLoginDetails()
+    email = session['email']
+    with sqlite3.connect('data_management.db') as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT user_id FROM user_info WHERE email = ?", (email,))
+        userId = cur.fetchone()[0]
+        cur.execute(
+            "SELECT products.product_id, products.name, products.price, products.image,products.stock FROM products, kart WHERE products.product_id = kart.product_id AND kart.user_id = ?",
+            (userId,))
+        products = cur.fetchall()
+    totalPrice = 0
+    for row in products:
+        totalPrice += row[2]
+    return render_template("cart.html", products=products, totalPrice=totalPrice, loggedIn=loggedIn, name=name,
+                           noOfItems=noOfItems, noOfOrderss=noOfOrderss, noOfFavorite=noOfFavorite)
+
+
+@app.route("/removeFromCart")
+def removeFromCart():
+    if 'email' not in session:
+        return redirect(url_for('loginForm'))
+    email = session['email']
+    product_id = int(request.args.get('product_id'))
+    with sqlite3.connect('data_management.db') as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT user_id FROM user_info WHERE email = ?", (email,))
+        user_id = cur.fetchone()[0]
+        try:
+            cur.execute("DELETE FROM kart WHERE user_id = ? AND product_id = ?", (user_id, product_id))
+            conn.commit()
+            msg = "removed successfully"
+        except:
+            conn.rollback()
+            msg = "error occured"
+    conn.close()
+    return redirect(url_for('cart'))
+
+
+@app.route("/displayCategory")
+def displayCategory():
+    loggedIn, name, noOfOrderss, noOfItems, noOfFavorite = getLoginDetails()
+    categoryId = request.args.get("categoryId")
+    with sqlite3.connect('data_management.db') as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT products.product_id, products.name, products.price, products.image, categories.name \
+                      FROM products, categories WHERE products.categoryId = categories.categoryId AND categories.categoryId = ?",
+                    (categoryId,))
+        data = cur.fetchall()
+    conn.close()
+    categoryName = data[0][4]
+    data = parse(data)
+    return render_template('displayCategory.html', data=data, loggedIn=loggedIn, name=name, noOfItems=noOfItems,
+                           noOfOrderss=noOfOrderss, noOfFavorite=noOfFavorite, categoryName=categoryName)
+
+
+@app.route("/productDetails")
+def productDetails():
+    loggedIn, name, noOfOrderss, noOfItems, noOfFavorite = getLoginDetails()
+    product_id = request.args.get('product_id')
+    with sqlite3.connect('data_management.db') as conn:
+        cur = conn.cursor()
+        # Get the content of the product details page
+        cur.execute(
+            'SELECT product_id, name, price, description, image, stock,categoryId FROM products WHERE product_id = ?',
+            (product_id,))
+        productData = cur.fetchone()
+        # Trigger and report to the user behavior table- PV type
+        if 'email' in session:
+            cur.execute("SELECT user_id FROM user_info WHERE email = ?", (session['email'],))
+            user_id = cur.fetchone()[0]
+            behavior_type = 'pv'
+            categoryId = productData[6]
+            create_time = time.time()
+            behavior_id = int(str(np.random.randint(1, 100)) + str(time.time())[0:8])
+            date = time.strftime('%Y-%m-%d', time.localtime(create_time))
+            year = time.localtime(create_time).tm_year
+            month = time.localtime(create_time).tm_mon
+            day = time.localtime(create_time).tm_mday
+            hour = time.localtime(create_time).tm_hour
+            cur.execute("INSERT INTO user_behavior (behavior_id,user_id, product_id,categoryId,behavior_type,create_time,date,year,month,day,hour) \
+                  VALUES (?, ?,?,?, ?,?,?, ?,?,?, ?)", (
+            behavior_id, user_id, product_id, categoryId, behavior_type, create_time, date, year, month, day, hour))
+    conn.close()
+    return render_template("productDetails.html", data=productData, loggedIn=loggedIn, name=name, noOfItems=noOfItems,
+                           noOfOrderss=noOfOrderss, noOfFavorite=noOfFavorite)
+
+
+@app.route("/addToFavorite")
+def addToFavorite():
+    if 'email' not in session:
+        return redirect(url_for('loginForm'))
+    else:
+        loggedIn, name, noOfOrderss, noOfItems, noOfFavorite = getLoginDetails()
+        product_id = int(request.args.get('product_id'))
+        with sqlite3.connect('data_management.db') as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT user_id FROM user_info WHERE email = ?", (session['email'],))
+            user_id = cur.fetchone()[0]
+            favorite_id = int(str(np.random.randint(1, 100)) + str(time.time())[0:8])
+            try:
+                cur.execute("INSERT INTO favorite (favorite_id,user_id, product_id) VALUES (?, ?,?)",
+                            (favorite_id, user_id, product_id))
+                conn.commit()
+                msg = "Added successfully"
+            except:
+                conn.rollback()
+                traceback.print_exc()
+                msg = "Error occured"
+            cur.execute(
+                "SELECT products.product_id, products.name, products.price, products.image,products.stock,products.categoryId FROM products, favorite WHERE products.product_id = favorite.product_id AND favorite.user_id = ?",
+                (user_id,))
+            products = cur.fetchall()
+            # Trigger and report to the user behavior table- FAV type
+            create_time = time.time()
+            behavior_type = 'fav'
+            behavior_id = int(str(np.random.randint(1, 100)) + str(time.time())[0:8])
+            date = time.strftime('%Y-%m-%d', time.localtime(create_time))
+            year = time.localtime(create_time).tm_year
+            month = time.localtime(create_time).tm_mon
+            day = time.localtime(create_time).tm_mday
+            hour = time.localtime(create_time).tm_hour
+            cur.execute("INSERT INTO user_behavior (behavior_id,user_id, product_id,categoryId,behavior_type,create_time,date,year,month,day,hour) \
+                  VALUES (?, ?,?,?, ?,?,?, ?,?,?, ?)", (
+            behavior_id, user_id, product_id, products[0][5], behavior_type, create_time, date, year, month, day, hour))
+        conn.close()
+    return render_template("favorite.html", products=products, loggedIn=loggedIn, name=name, noOfItems=noOfItems,
+                           noOfOrderss=noOfOrderss, noOfFavorite=noOfFavorite)
+
+
+@app.route("/favorite")
+def favorite():
+    if 'email' not in session:
+        return redirect(url_for('loginForm'))
+    loggedIn, name, noOfOrderss, noOfItems, noOfFavorite = getLoginDetails()
+    email = session['email']
+    with sqlite3.connect('data_management.db') as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT user_id FROM user_info WHERE email = ?", (email,))
+        userId = cur.fetchone()[0]
+        cur.execute(
+            "SELECT products.product_id, products.name, products.price, products.image,products.stock FROM products, favorite WHERE products.product_id = favorite.product_id AND favorite.user_id = ?",
+            (userId,))
+        products = cur.fetchall()
+    return render_template("favorite.html", products=products, loggedIn=loggedIn, name=name, noOfItems=noOfItems,
+                           noOfOrderss=noOfOrderss, noOfFavorite=noOfFavorite)
+
+
+@app.route("/removeFromFavorite")
+def removeFromFavorite():
+    if 'email' not in session:
+        return redirect(url_for('loginForm'))
+    email = session['email']
+    product_id = int(request.args.get('product_id'))
+    with sqlite3.connect('data_management.db') as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT user_id FROM user_info WHERE email = ?", (email,))
+        user_id = cur.fetchone()[0]
+        try:
+            cur.execute("DELETE FROM favorite WHERE user_id = ? AND product_id = ?", (user_id, product_id))
+            conn.commit()
+            msg = "removed successfully"
+        except:
+            conn.rollback()
+            msg = "error occured"
+    conn.close()
+    return redirect(url_for('favorite'))
+
+
+@app.route("/addToOrders")
+def addToOrders():
+    if 'email' not in session:
+        return redirect(url_for('loginForm'))
+    else:
+        loggedIn, name, noOfOrderss, noOfItems, noOfFavorite = getLoginDetails()
+        product_id = int(request.args.get('product_id'))
+        with sqlite3.connect('data_management.db') as conn:
+            cur = conn.cursor()
+            cur.execute("SELECT user_id FROM user_info WHERE email = ?", (session['email'],))
+            user_id = cur.fetchone()[0]
+            cur.execute("SELECT name, price,categoryId FROM products WHERE product_id = ?", (product_id,))
+            products = cur.fetchall()
+            product_name = products[0][0]
+            product_price = products[0][1]
+            categoryId = products[0][2]
+            create_time = time.time()
+            date = time.strftime('%Y-%m-%d', time.localtime(create_time))
+            year = time.localtime(create_time).tm_year
+            month = time.localtime(create_time).tm_mon
+            day = time.localtime(create_time).tm_mday
+            hour = time.localtime(create_time).tm_hour
+            order_id = int(str(np.random.randint(1, 100)) + str(time.time())[0:10])
+            try:
+                cur.execute("INSERT INTO orders (order_id,user_id, product_id,product_name,product_price,create_time,date,year,month,day,hour) \
+                VALUES (?, ?,?,?,?,?,?,?,?,?,?)", (
+                order_id, user_id, product_id, product_name, product_price, create_time, date, year, month, day, hour))
+                conn.commit()
+                msg = "Added successfully"
+            except:
+                conn.rollback()
+                traceback.print_exc()
+                msg = "Error occured"
+            cur.execute("SELECT product_name, product_price, date FROM orders WHERE user_id = ?", (user_id,))
+            orders = cur.fetchall()
+            # Trigger and report to the user behavior table- BUY type
+            behavior_type = 'buy'
+            behavior_id = int(str(np.random.randint(1, 100)) + str(time.time())[0:8])
+            date = time.strftime('%Y-%m-%d', time.localtime(create_time))
+            year = time.localtime(create_time).tm_year
+            month = time.localtime(create_time).tm_mon
+            day = time.localtime(create_time).tm_mday
+            hour = time.localtime(create_time).tm_hour
+            cur.execute("INSERT INTO user_behavior (behavior_id,user_id, product_id,categoryId,behavior_type,create_time,date,year,month,day,hour) \
+                  VALUES (?, ?,?,?, ?,?,?, ?,?,?, ?)", (
+            behavior_id, user_id, product_id, categoryId, behavior_type, create_time, date, year, month, day, hour))
+        conn.close()
+        return render_template("orders.html", orders=orders, loggedIn=loggedIn, name=name, noOfItems=noOfItems,
+                               noOfOrderss=noOfOrderss, noOfFavorite=noOfFavorite)
+
+
+@app.route("/orders")
+def Orders():
+    if 'email' not in session:
+        return redirect(url_for('loginForm'))
+    loggedIn, name, noOfOrderss, noOfItems, noOfFavorite = getLoginDetails()
+    email = session['email']
+    with sqlite3.connect('data_management.db') as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT user_id FROM user_info WHERE email = ?", (email,))
+        user_id = cur.fetchone()[0]
+        cur.execute("SELECT product_name, product_price, date FROM orders WHERE user_id = ?", (user_id,))
+        orders = cur.fetchall()
+        conn.rollback()
+        traceback.print_exc()
+    return render_template("orders.html", orders=orders, loggedIn=loggedIn, name=name, noOfItems=noOfItems,
+                           noOfOrderss=noOfOrderss, noOfFavorite=noOfFavorite)
+
+
+@app.route("/add")
+def admin():
+    with sqlite3.connect('data_management.db') as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT categoryId, name FROM categories")
+        categories = cur.fetchall()
+    conn.close()
+    return render_template('add.html', categories=categories)
+
+
+@app.route("/addItem", methods=["GET", "POST"])
+def addItem():
+    if request.method == "POST":
+        name = request.form['name']
+        price = float(request.form['price'])
+        description = request.form['description']
+        stock = int(request.form['stock'])
+        categoryId = int(request.form['category'])
+
+        # Uploading image procedure
+        image = request.files['image']
+        if image and allowed_file(image.filename):
+            filename = secure_filename(image.filename)
+            image.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        imagename = filename
+        with sqlite3.connect('data_management.db') as conn:
+            try:
+                cur = conn.cursor()
+                cur.execute(
+                    '''INSERT INTO products (name, price, description, image, stock, categoryId) VALUES (?, ?, ?, ?, ?, ?)''',
+                    (name, price, description, imagename, stock, categoryId))
+                conn.commit()
+                msg = "added successfully"
+            except:
+                msg = "error occured"
+                conn.rollback()
+        conn.close()
+        return redirect(url_for('ebuy'))
+
+
+def allowed_file(filename):
+    return '.' in filename and \
+        filename.rsplit('.', 1)[1] in ALLOWED_EXTENSIONS
+
+
+def csv_behavior_insert():
+    behavior = pd.read_csv('D:/data/e-commerce01.csv')
+    with sqlite3.connect('data_management.db') as conn:
+        cur = conn.cursor()
+        for i, r in behavior.iterrows():
+            try:
+                cur.execute("INSERT INTO user_behavior \
+                           (behavior_id,user_id,product_id,categoryId,behavior_type,create_time,date,year,month,day,hour) \
+                            VALUES (?, ?,?,?, ?,?,?,?, ?,?,?)", \
+                            (r[0], r[1], r[2], r[3], r[4], r[5], time.strftime("%Y-%m-%d", time.localtime(r[5])),
+                             time.localtime(r[5]).tm_year, time.localtime(r[5]).tm_mon, time.localtime(r[5]).tm_mday,
+                             time.localtime(r[5]).tm_hour))
+                conn.commit()
+            except:
+                conn.rollback()
+                traceback.print_exc()
+                msg = "Error occured"
+    conn.close()
+
+
+def csv_order_insert():
+    behavior = pd.read_csv('D:/data/e-commerce02.csv')
+    with sqlite3.connect('data_management.db') as conn:
+        cur = conn.cursor()
+        for i, r in behavior.iterrows():
+            try:
+                cur.execute("INSERT INTO orders \
+                           (order_id,user_id,product_id,product_price,product_name,create_time,date,year,month,day,hour) \
+                            VALUES (?, ?,?,?, ?,?,?,?, ?,?,?)", \
+                            (r[0], r[1], r[2], r[3], r[4], r[5], time.strftime("%Y-%m-%d", time.localtime(r[5])),
+                             time.localtime(r[5]).tm_year, time.localtime(r[5]).tm_mon, time.localtime(r[5]).tm_mday,
+                             time.localtime(r[5]).tm_hour))
+                conn.commit()
+            except:
+                conn.rollback()
+                traceback.print_exc()
+                msg = "Error occured"
+    conn.close()
+
+
+######## draw user activity plot
+def user_activity_daily():
+    with sqlite3.connect('data_management.db') as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT date,COUNT(DISTINCT user_id) as UV, COUNT(user_id) as PV \
+                      FROM user_behavior GROUP BY date")
+        date = []
+        uv = []
+        pv = []
+        for r in cur.fetchall():
+            date.append(r[0])
+            uv.append(r[1])
+            pv.append(r[2])
+        fig, ax = plt.subplots(1, 2, figsize=(16, 4))
+        fig.suptitle('Daily Activity Chart', fontsize=14)
+        fig.autofmt_xdate(rotation=45)
+        ax[0].bar(x=date, height=uv, label='UV', color='#f9713c')
+        ax[0].set_xlabel('Date')
+        ax[0].set_ylabel('Number')
+        ax[0].legend()
+
+        ax[1].bar(x=date, height=pv, label='PV', color='#f9713c')
+        ax[1].set_xlabel('Date')
+        ax[1].set_ylabel('Number')
+        ax[1].legend()
+
+        plt.ion()
+        # figure 保存为二进制文件
+        buffer = BytesIO()
+        plt.savefig(buffer)
+        plot_data = buffer.getvalue()
+        # 将matplotlib图片转换为HTML
+        imb = base64.b64encode(plot_data)  # 对plot_data进行编码
+        ims = imb.decode()
+        imd = "data:image/png;base64," + ims
+        plt.clf()
+        plt.close()
+    conn.close()
+    return imd
+
+
+def user_activity_hour():
+    with sqlite3.connect('data_management.db') as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT hour,COUNT(DISTINCT user_id) as UV, COUNT(user_id) as PV \
+                     FROM user_behavior  GROUP BY hour")
+        hour = []
+        uv = []
+        pv = []
+        for r in cur.fetchall():
+            hour.append(r[0])
+            uv.append(r[1])
+            pv.append(r[2])
+        fig, ax = plt.subplots(1, 2, figsize=(16, 4))
+        fig.suptitle('Hour Activity Chart', fontsize=14)
+        ax[0].bar(x=hour, height=uv, label='UV', color='#b3e4a1')
+        ax[0].set_xlabel('Date')
+        ax[0].set_ylabel('Number')
+        ax[0].legend()
+
+        ax[1].bar(x=hour, height=pv, label='PV', color='#b3e4a1')
+        ax[1].set_xlabel('Date')
+        ax[1].set_ylabel('Number')
+        ax[1].legend()
+        plt.ion()
+        # figure 保存为二进制文件
+        buffer = BytesIO()
+        plt.savefig(buffer)
+        plot_data = buffer.getvalue()
+        # 将matplotlib图片转换为HTML
+        imb = base64.b64encode(plot_data)  # 对plot_data进行编码
+        ims = imb.decode()
+        imd = "data:image/png;base64," + ims
+        plt.clf()
+        plt.close()
+    conn.close()
+    return imd
+
+
+def average_pv():
+    with sqlite3.connect('data_management.db') as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT date,COUNT(DISTINCT user_id) as UV, COUNT(user_id) as PV, \
+                     COUNT(user_id)/COUNT(DISTINCT user_id) AS meanPVofUV  FROM user_behavior \
+                      GROUP BY date")
+        date = []
+        meanPVofUV_day = []
+        for r in cur.fetchall():
+            date.append(r[0])
+            meanPVofUV_day.append(r[3])
+        cur.execute("SELECT hour,COUNT(DISTINCT user_id) as UV, COUNT(user_id) as PV, \
+                     COUNT(user_id)/COUNT(DISTINCT user_id) AS meanPVofUV  FROM user_behavior \
+                      GROUP BY hour")
+        hour = []
+        meanPVofUV_hour = []
+        for r in cur.fetchall():
+            hour.append(r[0])
+            meanPVofUV_hour.append(r[3])
+        fig, ax = plt.subplots(1, 2, figsize=(16, 4))
+        fig.suptitle('PV per capita', fontsize=14)
+        fig.autofmt_xdate(rotation=45)
+        ax[0].bar(date, meanPVofUV_day, color='#5CACEE')
+        ax[0].set_xlabel('Date')
+        ax[0].set_ylabel('PV')
+        ax[0].hlines(np.mean(meanPVofUV_day), date[0], date[-1], linestyle='dashed', lw=0.5)
+
+        ax[1].bar(hour, meanPVofUV_hour, color='#5CACEE')
+        ax[1].set_xlabel('hour')
+        ax[1].set_ylabel('PV')
+        ax[1].hlines(np.mean(meanPVofUV_hour), hour[0], hour[-1], linestyle='dashed', lw=0.5)
+        plt.ion()
+        # figure 保存为二进制文件
+        buffer = BytesIO()
+        plt.savefig(buffer)
+        plot_data = buffer.getvalue()
+        # 将matplotlib图片转换为HTML
+        imb = base64.b64encode(plot_data)  # 对plot_data进行编码
+        ims = imb.decode()
+        imd = "data:image/png;base64," + ims
+        plt.clf()
+        plt.close()
+    conn.close()
+    return imd
+
+
+###############################Funnel Model for conversion rate【Browse--Purchase&Favorite--Purchase】####################################
+# the action Funnel Model
+def conversion_rate_action():
+    with sqlite3.connect('data_management.db') as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(behavior_type) FROM user_behavior WHERE behavior_type='pv'")
+        pv_sum = cur.fetchall()
+        cur.execute("SELECT COUNT(behavior_type) FROM user_behavior WHERE behavior_type='cart' or behavior_type='fav'")
+        cf_sum = cur.fetchall()
+        cur.execute("SELECT COUNT(behavior_type) FROM user_behavior WHERE behavior_type='buy'")
+        buy_sum = cur.fetchall()
+        convert_rate_action = [100, cf_sum[0][0] / pv_sum[0][0] * 100, buy_sum[0][0] / cf_sum[0][0] * 100]
+        x_data = ["Website visit", "Add to cart & Add to favorite", "Buy product"]
+
+        data = [[x_data[i], convert_rate_action[i]] for i in range(len(x_data))]
+
+        (
+            Funnel()
+            .add(
+                series_name="",
+                data_pair=data,
+                gap=2,
+                tooltip_opts=opts.TooltipOpts(trigger="item", formatter="{a} <br/>{b} : {c}%"),
+                label_opts=opts.LabelOpts(is_show=True, position="inside"),
+                itemstyle_opts=opts.ItemStyleOpts(border_color="#fff", border_width=1),
+            )
+            .set_global_opts(title_opts=opts.TitleOpts(title="Consumer action funnel",
+                                                       subtitle="Browse --> Purchase&Favorite --> Purchase"))
+            .render("templates/funnel_action.html")
+        )
+    conn.close()
+
+
+def conversion_rate_individual():
+    with sqlite3.connect('data_management.db') as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(DISTINCT(user_id)) FROM user_behavior WHERE behavior_type='pv'")
+        user_pv = cur.fetchall()
+        cur.execute(
+            "SELECT COUNT(DISTINCT(user_id)) FROM user_behavior WHERE behavior_type='cart' or behavior_type='fav'")
+        user_cf = cur.fetchall()
+        cur.execute("SELECT COUNT(DISTINCT(user_id)) FROM user_behavior WHERE behavior_type='buy'")
+        user_buy = cur.fetchall()
+        convert_rate_individual = [100, user_cf[0][0] / user_pv[0][0] * 100, user_buy[0][0] / user_cf[0][0] * 100]
+        x_data = ["Website visit", "Add to cart & Add to favorite", "Buy product"]
+
+        data = [[x_data[i], convert_rate_individual[i]] for i in range(len(x_data))]
+
+        (
+            Funnel()
+            .add(
+                series_name="",
+                data_pair=data,
+                gap=2,
+                tooltip_opts=opts.TooltipOpts(trigger="item", formatter="{a} <br/>{b} : {c}%"),
+                label_opts=opts.LabelOpts(is_show=True, position="inside"),
+                itemstyle_opts=opts.ItemStyleOpts(border_color="#fff", border_width=1),
+            )
+            .set_global_opts(title_opts=opts.TitleOpts(title="Individual funnel plot",
+                                                       subtitle="Browse --> Purchase&Favorite --> Purchase"))
+            .render("templates/funnel_individual.html")
+        )
+    conn.close()
+
+
+############################################# User order plot #############################################
+def user_order():
+    with sqlite3.connect('data_management.db') as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT date,COUNT(DISTINCT user_id), COUNT(product_id) ,SUM(product_price) \
+                      FROM orders GROUP BY date")
+        date = []
+        noOfBuyer = []
+        noOfOrder = []
+        GMV = []
+        for r in cur.fetchall():
+            date.append(r[0])
+            noOfBuyer.append(r[1])
+            noOfOrder.append(r[2])
+            GMV.append(r[3])
+        fig, ax = plt.subplots(1, 3, figsize=(16, 4))
+        fig.suptitle('User order data graph', fontsize=14)
+        fig.autofmt_xdate(rotation=45)
+        ax[0].bar(date, noOfBuyer, label='Buyer', color='#f9713c')
+        ax[0].set_xlabel('Date')
+        ax[0].set_ylabel('Number')
+        ax[0].legend()
+        ax[1].bar(date, noOfOrder, label='Orders', color='#b3e4a1')
+        ax[1].set_xlabel('Date')
+        ax[1].legend()
+        ax[2].bar(date, GMV, label='GMV', color='#5CACEE')
+        ax[2].set_xlabel('Date')
+        ax[2].legend()
+        plt.ion()
+        # figure 保存为二进制文件
+        buffer = BytesIO()
+        plt.savefig(buffer)
+        plot_data = buffer.getvalue()
+        # 将matplotlib图片转换为HTML
+        imb = base64.b64encode(plot_data)  # 对plot_data进行编码
+        ims = imb.decode()
+        imd = "data:image/png;base64," + ims
+        plt.clf()
+        plt.close()
+    conn.close()
+    return imd
+
+
+def hot_product():
+    with sqlite3.connect('data_management.db') as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT product_name, COUNT(order_id), SUM(product_price) \
+                      FROM orders GROUP BY product_id")
+        product = []
+        sales_volume = []
+        sales_money = []
+        for r in cur.fetchall():
+            product.append(r[0])
+            sales_volume.append(r[1])
+            sales_money.append(r[2])
+        fig, ax = plt.subplots(1, 2, figsize=(16, 4))
+        fig.suptitle('Hot product chart', fontsize=14)
+        fig.autofmt_xdate(rotation=45)
+        ax[0].bar(product, sales_volume, label='Sales Volume', color='red')
+        ax[0].set_xlabel('Products')
+        ax[0].set_ylabel('Number')
+        ax[0].legend()
+
+        ax[1].bar(product, sales_money, label='Sales Money', color='orange')
+        ax[1].set_xlabel('Products')
+        ax[0].set_ylabel('Sales Money')
+        ax[1].legend()
+        plt.ion()
+        # figure 保存为二进制文件
+        buffer = BytesIO()
+        plt.savefig(buffer)
+        plot_data = buffer.getvalue()
+        # 将matplotlib图片转换为HTML
+        imb = base64.b64encode(plot_data)  # 对plot_data进行编码
+        ims = imb.decode()
+        imd = "data:image/png;base64," + ims
+        plt.clf()
+        plt.close()
+    conn.close()
+    return imd
+
+
+########################################## Using RFM and Kmeans to classify buyers ###########################
+def RFM_kmeans():
+    with sqlite3.connect('data_management.db') as conn:
+        cur = conn.cursor()
+        cur.execute("SELECT user_id, MIN(18-day),COUNT(order_id),SUM(product_price) FROM orders GROUP BY user_id")
+        user_id = []
+        recency = []
+        frequency = []
+        monetary = []
+        for x in cur.fetchall():
+            user_id.append(x[0])
+            recency.append(x[1])
+            frequency.append(x[2])
+            monetary.append(x[3])
+        rfm = pd.DataFrame({'user_id': user_id, 'recency': recency, 'frequency': frequency, 'monetary': monetary})
+        # z-score stadardize data
+        standardizer = StandardScaler()
+        std_data = pd.DataFrame(standardizer.fit_transform(rfm.iloc[:, [1, 2, 3]]))
+        mean_X, std_X = standardizer.mean_, standardizer.scale_
+        # kmeans group buyer
+        my_kmeans = KMeans(n_clusters=3, random_state=10)
+        my_kmeans.fit(std_data)
+        clusters = my_kmeans.predict(std_data)
+        centroids = my_kmeans.cluster_centers_
+        # group results
+        rfm['group'] = clusters
+        # Cluster center coordinate restoration
+        centroids_new = centroids * std_X + mean_X
+    return rfm, centroids_new
+
+
+def radar_group():
+    rfm, centroids_new = RFM_kmeans()
+    group1 = [list(centroids_new[0])]
+    group2 = [list(centroids_new[1])]
+    group3 = [list(centroids_new[2])]
+    radar = (
+        Radar()
+        .add_schema(
+            schema=[
+                opts.RadarIndicatorItem(name="recency", max_=max(rfm['recency'])),
+                opts.RadarIndicatorItem(name="frequency", max_=max(rfm['frequency'])),
+                opts.RadarIndicatorItem(name="monetary", max_=max(rfm['monetary']))]
+
+        )
+        .add("group1", group1, color="#f9713c")
+        .add("group2", group2, color="#b3e4a1")
+        .add("group3", group3, color="#5CACEE")
+        .set_series_opts(label_opts=opts.LabelOpts(is_show=False))
+        .set_global_opts(
+            legend_opts=opts.LegendOpts(),
+            title_opts=opts.TitleOpts(title="Radar-Buyer Group"),
+        ).render("templates/radar_buyer_mode.html")
+    )
+    return radar
+
+
+def visualization_group():
+    rfm, centroids_new = RFM_kmeans()
+    plt.figure(figsize=(6, 4))
+    plt.ylim(0, 30)
+    plt.bar(range(3), rfm.groupby('group')['group'].count())
+    plt.xticks(range(3), ['group1', 'group2', 'group3'])
+    x = [0, 1, 2]
+    y = rfm.groupby('group')['group'].count() + 2
+    text = rfm.groupby('group')['group'].count()
+    i = 0
+    for a, b in zip(x, y):
+        plt.text(a, b, text[i])
+        i += 1
+    plt.show()
+
+
+@app.route('/user/activity')
+def activity():
+    imd1 = user_activity_daily()
+    imd2 = user_activity_hour()
+    imd3 = average_pv()
+    return render_template('/userVisual.html', img=imd1, img2=imd2, img3=imd3)
+
+
+@app.route('/user/order')
+def order():
+    imd1 = user_order()
+    imd2 = hot_product()
+    imd3 = None
+    return render_template('/userVisual.html', img=imd1, img2=imd2, img3=imd3)
+
+
+@app.route('/user/radar')
+def radar():
+    rfm, centroids_new = RFM_kmeans()
+    res = []
+    for i in range(len(rfm)):
+        res.append(tuple(rfm.iloc[i]))
+    return render_template('/radar_buyer_mode.html', res=res)
+
+
+@app.route('/user/funnel01')
+def funnel01():
+    #    conversion_rate_action()
+    return render_template('/funnel_action.html')
+
+
+@app.route('/user/funnel02')
+def funnel02():
+    #    conversion_rate_individual()
+    return render_template('/funnel_individual.html')
+
+
 if __name__ == '__main__':
     # sql_init()
+    # app.run('localhost', 9002)
     run_simple('localhost', 9001, app)
